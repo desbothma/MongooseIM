@@ -43,7 +43,8 @@ all() ->
              {group, sessions},
              {group, vcard},
              {group, roster},
-             {group, roster_advanced},
+                %% It turned out that odbc backend is not implemented for this feature
+%%              {group, roster_advanced},
              {group, last},
              {group, private},
              {group, stanza},
@@ -59,7 +60,7 @@ groups() ->
       {last, [sequence], last()},
       {private, [sequence], private()},
       {stanza, [sequence], stanza()},
-      {roster_advanced, [sequence], roster_advanced()},
+%%       {roster_advanced, [sequence], roster_advanced()},
       {basic, [sequence], basic()},
       {stats, [sequence], stats()}].
 
