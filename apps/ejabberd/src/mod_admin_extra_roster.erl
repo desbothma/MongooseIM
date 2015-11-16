@@ -469,9 +469,14 @@ process_rosteritems(ActionS, SubsS, AsksS, UsersS, ContactsS) ->
 -spec rosteritem_purge(delete_action() | list_action()) -> {'atomic','ok'}.
 rosteritem_purge(Options) ->
     Num_rosteritems = mnesia:table_info(roster, size),
-    io:format("There are ~p roster items in total.~n", [Num_rosteritems]),
-    Key = mnesia:dirty_first(roster),
-    ok = rip(Key, Options, {0, Num_rosteritems, 0, 0}),
+    case Num_rosteritems of
+        0 ->
+            io:format("Roster table is empty.~n");
+        _ ->
+            io:format("There are ~p roster items in total.~n", [Num_rosteritems]),
+            Key = mnesia:dirty_first(roster),
+            ok = rip(Key, Options, {0, Num_rosteritems, 0, 0})
+    end,
     {atomic, ok}.
 
 

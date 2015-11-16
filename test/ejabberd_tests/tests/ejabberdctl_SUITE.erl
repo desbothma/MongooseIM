@@ -43,6 +43,7 @@ all() ->
              {group, sessions},
              {group, vcard},
              {group, roster},
+             {group, roster_advanced},
              {group, last},
              {group, private},
              {group, stanza},
@@ -52,14 +53,15 @@ all() ->
 
 groups() ->
      [{accounts, [sequence], accounts()},
-        {sessions, [sequence], sessions()},
-        {vcard, [sequence], vcard()},
-        {roster, [sequence], roster()},
-        {last, [sequence], last()},
-        {private, [sequence], private()},
-        {stanza, [sequence], stanza()},
-        {basic, [sequence], basic()},
-        {stats, [sequence], stats()}].
+      {sessions, [sequence], sessions()},
+      {vcard, [sequence], vcard()},
+      {roster, [sequence], roster()},
+      {last, [sequence], last()},
+      {private, [sequence], private()},
+      {stanza, [sequence], stanza()},
+      {roster_advanced, [sequence], roster_advanced()},
+      {basic, [sequence], basic()},
+      {stats, [sequence], stats()}].
 
 basic() ->
     [simple_register, simple_unregister, register_twice,
@@ -83,13 +85,16 @@ sessions() -> [num_resources_num, kick_session, status,
 vcard() -> [vcard_rw, vcard2_rw, vcard2_multi_rw].
 
 roster() -> [rosteritem_rw, presence_after_add_rosteritem,
-             push_roster, push_roster_all, push_roster_alltoal,
-             process_rosteritems_list_simple,
-             process_rosteritems_list_nomatch,
-             process_rosteritems_list_advanced1,
-             process_rosteritems_list_advanced2,
-             process_rosteritems_delete_advanced,
-             process_rosteritems_delete_advanced2].
+             push_roster,
+             push_roster_all,
+             push_roster_alltoall].
+
+roster_advanced() ->[process_rosteritems_list_simple,
+                          process_rosteritems_list_nomatch,
+                          process_rosteritems_list_advanced1,
+                          process_rosteritems_list_advanced2,
+                          process_rosteritems_delete_advanced,
+                          process_rosteritems_delete_advanced2].
 
 last() -> [set_last].
 
@@ -138,18 +143,19 @@ init_per_group(vcard, Config) ->
 init_per_group(_GroupName, Config) ->
     Config.
 
-end_per_group(roster, Config) ->
+end_per_group(Rosters, Config) when (Rosters == roster) or (Rosters == roster_advanced) ->
     TemplatePath = escalus_config:get_config(roster_template, Config),
     RegUsers = [atom_to_list(U) || {U, _} <- escalus_config:get_config(escalus_users, Config)],
     {ok, [Roster]} = file:consult(TemplatePath),
+    io:format("Roster is ~p~n and registred is ~p",[Roster, RegUsers]),
     C = fun({U, S, _, _}) ->
         case lists:member(U, RegUsers) of
             true ->
-                ok;
-            _ ->
                 SB = string_to_binary(S),
                 UB = string_to_binary(U),
-                escalus_ejabberd:rpc(ejabberd_hooks, run, [remove_user, SB, [UB, SB]])
+                escalus_ejabberd:rpc(ejabberd_hooks, run, [remove_user, SB, [UB, SB]]);
+            _ ->
+               ok
         end
     end,
     lists:foreach(C, Roster),
@@ -474,9 +480,11 @@ process_rosteritems_list_simple(Config) ->
         {BobName, Domain, _} = get_user_data(bob, Config),
         %% when
         {_, 0} = ejabberdctl("add_rosteritem", [AliceName, Domain, BobName, Domain, "MyBob", "MyGroup", "both"], Config),
+        S = escalus:wait_for_stanzas(Alice, 2),
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, Contact], Config),
         %% then
-        {match, _} = re:run(R, ".*Matches:.*"++Contact++".*")
+        {match, _} = re:run(R, ".*Matches:.*"++Contact++".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, BobName, Domain], Config)
     end).
 
 process_rosteritems_list_nomatch(Config) ->
@@ -491,10 +499,12 @@ process_rosteritems_list_nomatch(Config) ->
         {BobName, Domain, _} = get_user_data(bob, Config),
         {_, 0} = ejabberdctl("add_rosteritem", [AliceName, Domain, BobName,
                                                 Domain, "MyBob", "MyGroup", "to"], Config),
+        escalus:wait_for_stanzas(Alice, 2),
         %% when
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, Contact], Config),
         %% then
-        nomatch = re:run(R, ".*Matches:.*"++Contact++".*")
+        nomatch = re:run(R, ".*Matches:.*"++Contact++".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, BobName, Domain], Config)
     end).
 
 process_rosteritems_list_advanced1(Config) ->
@@ -515,11 +525,14 @@ process_rosteritems_list_advanced1(Config) ->
                                                 Domain, "DearMike", "MyGroup", "both"], Config),
         {_, 0} = ejabberdctl("add_rosteritem", [AliceName, Domain, KateName,
                                                 Domain, "BestFriend", "MyGroup", "both"], Config),
+        escalus:wait_for_stanzas(Alice,4),
         %% when
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, ContactsRegexp], Config),
         %% then
         {match, _} = re:run(R, ".*Matches:.*"++ContactMike++".*"),
-        {match, _} = re:run(R, ".*Matches:.*"++ContactKate++".*")
+        {match, _} = re:run(R, ".*Matches:.*"++ContactKate++".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, MikeName, Domain], Config),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, KateName, Domain], Config)
     end).
 
 process_rosteritems_delete_advanced(Config) ->
@@ -540,11 +553,14 @@ process_rosteritems_delete_advanced(Config) ->
                                                 Domain, "DearMike", "MyGroup", "from"], Config),
         {_, 0} = ejabberdctl("add_rosteritem", [AliceName, Domain, KateName,
                                                 Domain, "Friend", "MyGroup", "from"], Config),
+        escalus:wait_for_stanzas(Alice,4),
         %% when
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, ContactsRegexp], Config),
         %% then
         {match, _} = re:run(R, ".*Matches:.*"++ContactMike++".*"),
-        nomatch = re:run(R, ".*Matches:.*"++ContactKate++".*")
+        nomatch = re:run(R, ".*Matches:.*"++ContactKate++".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, MikeName, Domain], Config),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, KateName, Domain], Config)
     end).
 
 process_rosteritems_list_advanced2(Config) ->
@@ -564,15 +580,18 @@ process_rosteritems_list_advanced2(Config) ->
                                                 Domain, "DearMike", "MyGroup", "both"], Config),
         {_, 0} = ejabberdctl("add_rosteritem", [AliceName, Domain, KateName,
                                                 Domain, "KateFromSchool", "MyGroup", "from"], Config),
+        escalus:wait_for_stanzas(Alice,4),
         %% when
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, ContactsRegexp], Config),
         %% then
         {match, _} = re:run(R, ".*Matches:.*"++ContactMike++".*"),
-        {match, _} = re:run(R, ".*Matches:.*"++ContactKate++".*")
+        {match, _} = re:run(R, ".*Matches:.*"++ContactKate++".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, MikeName, Domain], Config),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, KateName, Domain], Config)
     end).
 
 process_rosteritems_delete_advanced2(Config) ->
-    escalus:story(Config, [{alice, 1}, {bob, 1}, {mike, 1}, {kate, 1}], fun(_, Bob, Mike, Kate) ->
+    escalus:story(Config, [{alice, 1}, {bob, 1}, {mike, 1}, {kate, 1}], fun(Alice, Bob, Mike, Kate) ->
         %% given
         Action = "delete",
         Subs = "to:from",
@@ -592,12 +611,17 @@ process_rosteritems_delete_advanced2(Config) ->
                                                 Domain, "HateHerSheHasSoNiceLegs", "MyGroup", "to"], Config),
         {_, 0} = ejabberdctl("add_rosteritem", [BobName, Domain, AliceName,
                                                 Domain, "Girlfriend", "MyGroup", "from"], Config),
+        escalus:wait_for_stanzas(Alice,4),
+        escalus:wait_for_stanzas(Bob, 2),
         %% when
         {R, 0} = ejabberdctl("process_rosteritems", [Action, Subs, Asks, User, ContactsReg], Config),
         %% then
-        {match, _} = re:run(R, ".*Matches:.*"++ContactMike++".*"),
-        nomatch = re:run(R, ".*Matches:.*"++ContactKate++".*"),
-        nomatch = re:run(R, ".*Matches:.*"++ContactBob++".*")
+        {match, _} = re:run(R, ".*Matches:.*" ++ ContactMike ++ ".*"),
+        nomatch = re:run(R, ".*Matches:.*" ++ ContactKate ++ ".*"),
+        nomatch = re:run(R, ".*Matches:.*" ++ ContactBob ++ ".*"),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, MikeName, Domain], Config),
+        {_, 0} = ejabberdctl("delete_rosteritem", [AliceName, Domain, KateName, Domain], Config),
+        {_, 0} = ejabberdctl("delete_rosteritem", [BobName, Domain, AliceName, Domain], Config)
     end).
 
 push_roster_all(Config) ->

@@ -81,31 +81,32 @@ commands() ->
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = get_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}],
-                           result = {content, binary}},
+                           result = {res, restuple}},
         #ejabberd_commands{name = get_vcard2_multi, tags = [vcard],
                            desc = "Get multiple contents from a vCard field",
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = get_vcard_multi,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}],
-                           result = {contents, {list, {value, binary}}}},
+%%                            result = {contents, {list, {value, binary}}}},
+                           result = {res, restuple}},
         #ejabberd_commands{name = set_vcard, tags = [vcard],
                            desc = "Set content in a vCard field",
                            longdesc = Vcard1FieldsString ++ "\n" ++ Vcard2FieldsString ++ "\n\n" ++ VcardXEP,
                            module = ?MODULE, function = set_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}, {content, binary}],
-                           result = {res, rescode}},
+                           result = {res, restuple}},
         #ejabberd_commands{name = set_vcard2, tags = [vcard],
                            desc = "Set content in a vCard subfield",
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = set_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}, {content, binary}],
-                           result = {res, rescode}},
+                           result = {res, restuple}},
         #ejabberd_commands{name = set_vcard2_multi, tags = [vcard],
                            desc = "Set multiple contents in a vCard subfield",
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = set_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}, {contents, {list, binary}}],
-                           result = {res, rescode}}
+                           result = {res, restuple}}
         ].
 
 %%%
@@ -191,10 +192,13 @@ get_vcard_content(User, Server, Data) ->
                 [] ->
                     {no_value_found_in_vcard, "Value not found in vcard"};
                 ElemList ->
-                    [Res | _] = [exml_query:cdata(Elem) || Elem <- ElemList],
-                    {ok, Res}
+                    List = [binary_to_list(exml_query:cdata(Elem)) || Elem <- ElemList],
+                    ResultList = string:join(List, "\n"),
+                    {ok, ResultList}
             end;
         [] ->
+            {vcard_not_found, "Vcard not found"};
+        [undefined, _] ->
             {vcard_not_found, "Vcard not found"}
     end.
 
