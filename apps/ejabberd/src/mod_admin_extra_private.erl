@@ -49,7 +49,7 @@ commands() ->
                            desc = "Get some information from a user private storage",
                            module = ?MODULE, function = private_get,
                            args = [{user, binary}, {host, binary}, {element, binary}, {ns, binary}],
-                           result = {res, restuple}},
+                           result = {content, string}},
         #ejabberd_commands{name = private_set, tags = [private],
                            desc = "Set to the user private storage",
                            module = ?MODULE, function = private_set,
@@ -66,14 +66,14 @@ commands() ->
 %% $ mongooseimctl private_get badlop localhost aa bb
 %% <aa xmlns='bb'>Cluth</aa>
 
--spec private_get(ejabberd:user(), ejabberd:server(), binary(), binary()) -> {Res, string()} when
-    Res :: user_does_not_exist | ok.
+-spec private_get(ejabberd:user(), ejabberd:server(), binary(), binary()) ->
+    {error, string()} | string().
 private_get(Username, Host, Element, Ns) ->
     case ejabberd_auth:is_user_exists(Username, Host) of
         true ->
             do_private_get(Username, Host, Element, Ns);
         false ->
-            {user_does_not_exist, io_lib:format("User ~s@~s does not exist", [Username, Host])}
+            {error, io_lib:format("User ~s@~s does not exist", [Username, Host])}
     end.
 
 do_private_get(Username, Host, Element, Ns) ->
@@ -87,8 +87,7 @@ do_private_get(Username, Host, Element, Ns) ->
     [#xmlel{ name = <<"query">>,
              attrs = [{<<"xmlns">>,<<"jabber:iq:private">>}],
              children = [SubEl] }] = ResIq#iq.sub_el,
-    Ret = exml:to_binary(SubEl),
-    {ok, Ret}.
+    exml:to_binary(SubEl).
 
 -spec private_set(ejabberd:user(), ejabberd:server(),
                   ElementString :: binary()) -> {Res, string()} when

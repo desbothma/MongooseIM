@@ -75,20 +75,19 @@ commands() ->
                            longdesc = Vcard1FieldsString ++ "\n" ++ Vcard2FieldsString ++ "\n\n" ++ VcardXEP,
                            module = ?MODULE, function = get_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}],
-                           result = {res, restuple}},
+                           result = {content, binary}},
         #ejabberd_commands{name = get_vcard2, tags = [vcard],
                            desc = "Get content from a vCard field",
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = get_vcard,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}],
-                           result = {res, restuple}},
+                           result = {content, binary}},
         #ejabberd_commands{name = get_vcard2_multi, tags = [vcard],
                            desc = "Get multiple contents from a vCard field",
                            longdesc = Vcard2FieldsString ++ "\n\n" ++ Vcard1FieldsString ++ "\n" ++ VcardXEP,
                            module = ?MODULE, function = get_vcard_multi,
                            args = [{user, binary}, {host, binary}, {name, binary}, {subname, binary}],
-%%                            result = {contents, {list, {value, binary}}}},
-                           result = {res, restuple}},
+                           result = {contents, {list, {value, binary}}}},
         #ejabberd_commands{name = set_vcard, tags = [vcard],
                            desc = "Set content in a vCard field",
                            longdesc = Vcard1FieldsString ++ "\n" ++ Vcard2FieldsString ++ "\n\n" ++ VcardXEP,
@@ -113,36 +112,33 @@ commands() ->
 %%% Vcard
 %%%
 -spec get_vcard(ejabberd:user(), ejabberd:server(), any())
-                       -> {Res, string()} when
-    Res :: ok | vcard_not_found | no_value_found_in_vcard | user_does_not_exist.
+                       -> {error, string()} | [binary()].
 get_vcard(User, Host, Name) ->
     case ejabberd_auth:is_user_exists(User, Host) of
         true ->
             get_vcard_content(User, Host, [Name]);
         false ->
-            {user_does_not_exist, io_lib:format("User ~s@~s does not exist", [User, Host])}
+            {error, io_lib:format("User ~s@~s does not exist", [User, Host])}
     end.
 
 -spec get_vcard(ejabberd:user(), ejabberd:server(), any(), any())
-               -> {Res, string()} when
-    Res :: ok | vcard_not_found | no_value_found_in_vcard | user_does_not_exist.
+               -> {error, string()} | [binary()].
 get_vcard(User, Host, Name, Subname) ->
     case ejabberd_auth:is_user_exists(User, Host) of
         true ->
             get_vcard_content(User, Host, [Name, Subname]);
         false ->
-            {user_does_not_exist, io_lib:format("User ~s@~s does not exist", [User, Host])}
+            {error, io_lib:format("User ~s@~s does not exist", [User, Host])}
     end.
 
 -spec get_vcard_multi(ejabberd:user(), ejabberd:server(), any(), any())
-               -> {Res, string()} when
-    Res :: ok | vcard_not_found | no_value_found_in_vcard | user_does_not_exist.
+               -> {error, string()} | list(binary()).
 get_vcard_multi(User, Host, Name, Subname) ->
     case ejabberd_auth:is_user_exists(User, Host) of
         true ->
             get_vcard_content(User, Host, [Name, Subname]);
         false ->
-            {user_does_not_exist, io_lib:format("User ~s@~s does not exist", [User, Host])}
+            {error, io_lib:format("User ~s@~s does not exist", [User, Host])}
     end.
 
 -spec set_vcard(ejabberd:user(), ejabberd:server(), [binary()],
@@ -178,8 +174,7 @@ get_module_resource(Server) ->
 
 
 -spec get_vcard_content(ejabberd:user(), ejabberd:server(), any())
-            -> {Res, string()} when
-    Res :: ok | vcard_not_found | no_value_found_in_vcard.
+            -> {error, string()} | list(binary()).
 get_vcard_content(User, Server, Data) ->
     [{_, Module, Function, _Opts}] = ets:lookup(sm_iqtable, {?NS_VCARD, Server}),
     JID = jlib:make_jid(User, Server, list_to_binary(get_module_resource(Server))),
@@ -190,16 +185,14 @@ get_vcard_content(User, Server, Data) ->
         [A1] ->
             case get_vcard(Data, A1) of
                 [] ->
-                    {no_value_found_in_vcard, "Value not found in vcard"};
+                    {error, "Value not found in vcard"};
                 ElemList ->
-                    List = [binary_to_list(exml_query:cdata(Elem)) || Elem <- ElemList],
-                    ResultList = string:join(List, "\n"),
-                    {ok, ResultList}
+                    [exml_query:cdata(Elem) || Elem <- ElemList]
             end;
         [] ->
-            {vcard_not_found, "Vcard not found"};
+            {error, "Vcard not found"};
         [undefined, _] ->
-            {vcard_not_found, "Vcard not found"}
+            {error, "Vcard not found"}
     end.
 
 

@@ -43,7 +43,7 @@ all() ->
              {group, sessions},
              {group, vcard},
              {group, roster},
-                %% It turned out that odbc backend is not implemented for this feature
+                %% Use this group only for Mnesia tests.
 %%              {group, roster_advanced},
              {group, last},
              {group, private},
