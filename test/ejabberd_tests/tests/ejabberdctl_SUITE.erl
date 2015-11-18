@@ -43,8 +43,7 @@ all() ->
              {group, sessions},
              {group, vcard},
              {group, roster},
-                %% Use this group only for Mnesia tests.
-%%              {group, roster_advanced},
+             {group, roster_advanced},
              {group, last},
              {group, private},
              {group, stanza},
@@ -60,7 +59,7 @@ groups() ->
       {last, [sequence], last()},
       {private, [sequence], private()},
       {stanza, [sequence], stanza()},
-%%       {roster_advanced, [sequence], roster_advanced()},
+      {roster_advanced, [sequence], roster_advanced()},
       {basic, [sequence], basic()},
       {stats, [sequence], stats()}].
 
@@ -141,6 +140,15 @@ init_per_group(vcard, Config) ->
         _ ->
             Config
     end;
+
+init_per_group(roster_advanced, Config) ->
+    case escalus_ejabberd:rpc(gen_mod,get_module_opt,[ct:get_config(ejabberd_domain), mod_roster, backend, mnesia]) of
+        mnesia ->
+            Config;
+        _ ->
+            {skip, command_process_rosteritems_supports_only_mnesia}
+    end;
+
 init_per_group(_GroupName, Config) ->
     Config.
 
